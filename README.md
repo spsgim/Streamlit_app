@@ -36,3 +36,13 @@ In the competitive retail industry, the ability to predict future sales accurate
   - Time Series Forecasting - ARIMA, SARIMAX
 6. Model Evaluation
   - Performance Matrices (R^2) and Residuals
+
+# Model Evaluation: Selection of R-squared (R²) Score
+
+In this project, we will use the R-squared (R²) score as our primary evaluation metric. The R² score, also known as the coefficient of determination, measures the proportion of the variance in the dependent variable (sales) that is predictable from the independent variables (features).
+Why R² Score?
+Interpretability: The R² score ranges from 0 to 1, where 0 indicates that the model explains none of the variance, and 1 indicates that the model explains all the variance. This makes it easy to understand how well the model is performing.
+Suitability for Regression: Since we are dealing with a regression problem, where the goal is to predict a continuous variable (sales), the R² score is a natural choice. It provides a clear indication of how well the model is capturing the relationship between the features and the target variable.
+Comparative Analysis: The R² score allows us to compare the performance of different models on the same scale. A higher R² score indicates a better fit, making it useful for evaluating and selecting the best model.
+
+By focusing on the R² score, we can effectively measure and compare the performance of our models, ensuring that we select the one that best explains the variance in sales.

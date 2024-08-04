@@ -3,9 +3,10 @@ import numpy as np
 from datetime import datetime
 import streamlit as st
 import pickle
+import lightgbm as lgb
 
 
-# Custom HTML for title with background and text color
+# Custom HTML f title with background and text color
 st.markdown("""
     <div style="background-color:#2E86C1;padding:6px;border-radius:6px">
     <h1 style="color:white;text-align:center;">Product Sales Forecasting</h1>

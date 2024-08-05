@@ -4,15 +4,17 @@ from datetime import datetime
 import streamlit as st
 import pickle
 import lightgbm as lgb
+import altair as alt
 
-
-# Custom HTML f title with background and text color
 st.markdown("""
-    <div style="background-color:#2E86C1;padding:6px;border-radius:6px">
-    <h1 style="color:white;text-align:center;">Product Sales Forecasting</h1>
+    <div style="background-color:#2E86C1;padding:10px;border-radius:6px;margin-bottom:20px">
+    <h2 style="color:white;text-align:center;font-family:Arial, sans-serif;font-size:36px;">Welcome to the Product Sales Forecasting App</h2>
     </div>
+    <p style="font-family:Arial, sans-serif;font-size:18px;text-align:left;color:#333333;margin-bottom:20px;">
+        This application is designed to help you forecast product sales based on historical data and various input features such as store type, location, region, and promotional activities. 
+        Use the sidebar to input the relevant details, and get instant sales predictions along with insightful historical sales trends.
+    </p>
     """, unsafe_allow_html=True)
-
 
 def extract_features(user_input):
     # Create a DataFrame from user input
@@ -93,7 +95,6 @@ def make_prediction(processed_df, model):
     prediction = model.predict(processed_df)
     return prediction
 
-
 # User inputs and feature extraction
 def get_user_inputs(store_df):
     st.sidebar.header('User Input Features')
@@ -124,14 +125,15 @@ def get_user_inputs(store_df):
         region_code = st.sidebar.selectbox('Region Code', options=['R1', 'R2', 'R3', 'R4'])
     
     # Date input
-    date = st.sidebar.date_input('Date', min_value=datetime(2018, 1, 1), max_value=datetime(2019, 12, 31))
+    date = st.sidebar.date_input('Date', value=datetime(2019,6,1), min_value=datetime(2018, 1, 1), max_value=datetime(2019, 12, 31))
     
+
     # Holiday input
     holiday = st.sidebar.selectbox('Holiday', options=['No', 'Yes'])
     
     # Discount input
     discount = st.sidebar.selectbox('Discount', options=['No', 'Yes'])
-    
+
     return {
         'Store_id': store_id,
         'Store_Type': store_type,
@@ -163,62 +165,85 @@ def load_resources():
         model = pickle.load(file)
     return scaler, model
 
+def forecast_plots(df, model, scaler, user_input):
+    st.subheader('Select Forecasting Period')
 
-def historical_plots(df):
-    df['Date'] = pd.to_datetime(df['Date'])
-    st.subheader(f'Historical Daily Sales')
+    # Set default start and end dates
+    default_start_date = datetime(2019, 6, 1)
+    default_end_date = datetime(2019, 6, 30)
 
-    daily_sales = df.groupby(['Date'])['Sales'].sum()
+    col1, col2= st.columns([1, 1])
+    with col1:
+        forecast_start = st.date_input('Start Date', value=default_start_date, min_value=datetime(2019, 6, 1), max_value=datetime(2019, 12, 31))
+    with col2:
+        forecast_end = st.date_input('End Date', value=default_end_date, min_value=forecast_start, max_value=datetime(2019, 12, 31))
 
-    st.line_chart(daily_sales)
+    forecast_dates = pd.date_range(start=forecast_start, end=forecast_end)
 
-    col1, col2 = st.columns(2)
-    with col1: 
-        st.subheader('Historical Weekly Sales')
-        weekly_sales = daily_sales.resample('W').sum()
-        st.line_chart(weekly_sales)
-    with col2: 
-        st.subheader('Historical Monthly Sales')
-        monthly_sales = daily_sales.resample('M').sum()
-        st.line_chart(monthly_sales)
+    forecast_data = []
 
-def display_prediction(prediction):
-    st.markdown(
-        f"""
-        <div style="
-            background-color: #f0f2f6;
-            padding: 20px;
-            border-radius: 10px;
-            text-align: center;">
-            <h2 style="color: #333333; font-size: 36px;">Predicted Sales: ${prediction:,.2f}</h2>
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
+    for date in forecast_dates:
+        daily_input = {
+            'Date': date,
+            'Holiday': user_input['Holiday'],
+            'Discount': user_input['Discount'],
+            'Store_Type': user_input['Store_Type'],
+            'Location_Type': user_input['Location_Type'],
+            'Region_Code': user_input['Region_Code']
+        }
 
-    # Add a button to reset or make a new prediction
-    if st.button('Make Another Prediction'):
-        st.experimental_rerun()
+        extracted_features = extract_features(daily_input)
+        encoded_features = one_hot_encode_features(extracted_features)
+        aligned_features = align_features_with_model(encoded_features)
+        scaled_features = scale_features(aligned_features, scaler)
 
+        predicted_sales = model.predict(scaled_features)[0]
+        forecast_data.append({'Date': date, 'Sales': predicted_sales})
+
+    forecast_df = pd.DataFrame(forecast_data)
+
+    # Move the button and plotting logic outside of col3
+    if st.button("Plot"):
+        # Filter historical data based on user input
+        filtered_data = df[(df['Store_Type'] == user_input['Store_Type']) &
+                           (df['Location_Type'] == user_input['Location_Type']) &
+                           (df['Region_Code'] == user_input['Region_Code']) &
+                           (df['Holiday'] == user_input['Holiday']) &
+                           (df['Discount'] == user_input['Discount'])]
+
+        historical_sales = filtered_data.groupby(['Date'])['Sales'].sum().reset_index()
+
+        combined_df = pd.concat([historical_sales, forecast_df])
+        combined_df['Type'] = ['Historical'] * len(historical_sales) + ['Forecasted'] * len(forecast_df)
+
+        # Plotting with Altair
+        chart = alt.Chart(combined_df).mark_line().encode(
+            x='Date:T',
+            y='Sales:Q',
+            color='Type:N'
+        ).properties(
+            title=f'Sales Forecast vs Historical Sales ({forecast_start} - {forecast_end})',
+            width=700,
+            height=400
+        )
+
+        st.altair_chart(chart)
 
 def main():
     
     df = pd.read_csv('TRAIN.csv')
     store_df = df.groupby(['Store_id'])[['Store_Type', 'Location_Type', 'Region_Code']].agg('max')
 
-    # st.title('Sales Prediction App')
-    
+    # Get user inputs
     user_input = get_user_inputs(store_df)
 
-    st.subheader('User Input')
-    st.write(user_input)
+    st.markdown("""
+                <h2 style="font-family:Arial, sans-serif;font-size:28px;color:#2E86C1;text-align:left;margin-top:30px;">
+                Predict Sales</h2>
+                """, unsafe_allow_html=True)
     
-    # Further processing and prediction will be implemented here...
-    # st.write("Feature processing and prediction logic goes here.")
-
-    # # Get user inputs
-    # user_input = get_user_inputs()
-    
+    st.write("***Click here to predict Sales as per your input***" )
+        
     # Load the scaler and model
     scaler, model = load_resources()
     
@@ -234,22 +259,29 @@ def main():
     # Scale the features
     scaled_features = scale_features(aligned_features, scaler)
     
-    if st.button("Predict Sales"):
+    if st.button("**Predict Sales**"):
         # Make the prediction
         prediction = make_prediction(scaled_features, model)
+        st.session_state['prediction'] = prediction
+
         
         # Display the prediction with formatting
-        st.markdown(
-            f"""
-            <div style="background-color: #f0f2f6; padding: 20px; border-radius: 10px;">
-                <h2 style="color: #4CAF50; text-align: center;">Predicted Sales:</h2>
-                <h1 style="font-size: 50px; text-align: center; color: #333;">{prediction[0]:,.2f}</h1>
-            </div>
-            """,
-            unsafe_allow_html=True
-        )
-    historical_plots(df)
+        if 'prediction' in st.session_state:
+            st.markdown(
+                f"""
+                <div style="background-color: #f0f2f6; padding: 1px; border-radius: 10px;">
+                    <h2 style="font-size: 18px; color: #4CAF50; text-align: center;">Predicted Sales:</h2>
+                    <h2 style="font-size: 36px; text-align: center; color: #333;">{st.session_state['prediction'][0]:,.2f}</h2>
+                </div>
+                """,
+                unsafe_allow_html=True
+            )
 
+    st.markdown("""
+                <h2 style="font-family:Arial, sans-serif;font-size:28px;color:#2E86C1;text-align:left;margin-top:30px;">
+                Forecast Your Future Sales</h2>
+                """, unsafe_allow_html=True)
+    forecast_plots(df, model, scaler, user_input)
 
 if __name__ == "__main__":
     main()

@@ -176,7 +176,7 @@ def forecast_plots(df, model, scaler, user_input):
     with col1:
         forecast_start = st.date_input('Start Date', value=default_start_date, min_value=datetime(2019, 6, 1), max_value=datetime(2019, 12, 31))
     with col2:
-        forecast_end = st.date_input('End Date', value=default_end_date, min_value=forecast_start, max_value=datetime(2019, 12, 31))
+        forecast_end = st.date_input('End Date', value=default_end_date, min_value=forecast_start)
 
     forecast_dates = pd.date_range(start=forecast_start, end=forecast_end)
 

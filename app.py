@@ -210,8 +210,8 @@ def main():
     
     user_input = get_user_inputs(store_df)
 
-    # st.subheader('User Input')
-    # st.write(user_input)
+    st.subheader('User Input')
+    st.write(user_input)
     
     # Further processing and prediction will be implemented here...
     # st.write("Feature processing and prediction logic goes here.")
